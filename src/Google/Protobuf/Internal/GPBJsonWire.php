@@ -2,24 +2,49 @@
 
 // Protocol Buffers - Google's data interchange format
 // Copyright 2008 Google Inc.  All rights reserved.
+// https://developers.google.com/protocol-buffers/
 //
-// Use of this source code is governed by a BSD-style
-// license that can be found in the LICENSE file or at
-// https://developers.google.com/open-source/licenses/bsd
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions are
+// met:
+//
+//     * Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//     * Redistributions in binary form must reproduce the above
+// copyright notice, this list of conditions and the following disclaimer
+// in the documentation and/or other materials provided with the
+// distribution.
+//     * Neither the name of Google Inc. nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+// "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+// LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+// A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+// OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+// SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+// LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+// DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+// THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+// (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+// OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 namespace Google\Protobuf\Internal;
 
 class GPBJsonWire
 {
-
     public static function serializeFieldToStream(
         $value,
         $field,
-        &$output, $has_field_name = true)
+        &$output,
+        $has_field_name = true,
+        $preserve_proto_field_names = false
+    )
     {
         if ($has_field_name) {
             $output->writeRaw("\"", 1);
-            $field_name = GPBJsonWire::formatFieldName($field);
+            $field_name = GPBJsonWire::formatFieldName($field, $preserve_proto_field_names);
             $output->writeRaw($field_name, strlen($field_name));
             $output->writeRaw("\":", 2);
         }
@@ -44,16 +69,16 @@ class GPBJsonWire
             $value_field = $map_entry->getFieldByNumber(2);
 
             switch ($key_field->getType()) {
-            case GPBType::STRING:
-            case GPBType::SFIXED64:
-            case GPBType::INT64:
-            case GPBType::SINT64:
-            case GPBType::FIXED64:
-            case GPBType::UINT64:
-                $additional_quote = false;
-                break;
-            default:
-                $additional_quote = true;
+                case GPBType::STRING:
+                case GPBType::SFIXED64:
+                case GPBType::INT64:
+                case GPBType::SINT64:
+                case GPBType::FIXED64:
+                case GPBType::UINT64:
+                    $additional_quote = false;
+                    break;
+                default:
+                    $additional_quote = true;
             }
 
             foreach ($values as $key => $value) {
@@ -139,7 +164,7 @@ class GPBJsonWire
                 if ($value < 0) {
                     $value = bcadd($value, "18446744073709551616");
                 }
-                // Intentional fall through.
+            // Intentional fall through.
             case GPBType::SFIXED64:
             case GPBType::INT64:
             case GPBType::SINT64:
@@ -220,9 +245,10 @@ class GPBJsonWire
         return true;
     }
 
-    private static function formatFieldName($field)
+    public static function formatFieldName($field, $preserve_proto_field_names)
     {
-        return $field->getJsonName();
+        return (boolval($preserve_proto_field_names) === false || $field->hasCustomJsonName()) ?
+            $field->getJsonName() : $field->getName();
     }
 
     // Used for escaping control chars in strings.
@@ -230,17 +256,17 @@ class GPBJsonWire
 
     private static function jsonNiceEscape($c)
     {
-      switch ($c) {
-          case '"':  return "\\\"";
-          case '\\': return "\\\\";
-          case '/': return "\\/";
-          case '\b': return "\\b";
-          case '\f': return "\\f";
-          case '\n': return "\\n";
-          case '\r': return "\\r";
-          case '\t': return "\\t";
-          default:   return NULL;
-      }
+        switch ($c) {
+            case '"':  return "\\\"";
+            case '\\': return "\\\\";
+            case '/': return "\\/";
+            case '\b': return "\\b";
+            case '\f': return "\\f";
+            case '\n': return "\\n";
+            case '\r': return "\\r";
+            case '\t': return "\\t";
+            default:   return NULL;
+        }
     }
 
     private static function isJsonEscaped($c)
@@ -269,9 +295,9 @@ class GPBJsonWire
                 }
                 $escaped_value .= $escape;
             } else {
-              if ($unescaped_run === "") {
-                $unescaped_run .= $c;
-              }
+                if ($unescaped_run === "") {
+                    $unescaped_run .= $c;
+                }
             }
         }
         $escaped_value .= $unescaped_run;
